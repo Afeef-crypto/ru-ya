@@ -1,0 +1,14 @@
+{
+  "language": "en",
+  "questionnaire": {
+    "dreamer_state": "anxiety",
+    "dream_time": "other_night",
+    "repetition": "once",
+    "waking_emotion": "fear",
+    "locale_context": "urban apartment",
+    "sensitive_flags": ["none"]
+  },
+  "narrative": "I saw a snake indoors at night. A man was there. I only observed and woke afraid.",
+  "expected_symbols": ["snake"],
+  "notes": "Golden-path fixture for hybrid retrieve + confidence scoring"
+}
