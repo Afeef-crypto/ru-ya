@@ -4,19 +4,17 @@ Cite-or-abstain Islamic dream interpretation assistant: structured intake → hy
 
 Dreams are **not retained by default** (24h purge). Interpretation is scholarly possibility, not prophecy. Source tiers stay `pending_scholar_review` until a qualified student of knowledge signs off.
 
-## Docs
-
-See [docs/README.md](docs/README.md) for architecture, intake UX, schema, ingest, retriever, guardrails, API, and roadmap.
-
 ## Repo layout
 
 ```
-docs/           Architecture & product specs
 sql/            Postgres + pgvector migrations
 src/ru_ya/      FastAPI + orchestrator + RAG modules
-web/            Next.js intake UI (skeleton)
+web/            Next.js intake UI
+scripts/        migrate / seed / health checks
 tests/          Unit + end-to-end fixture
 ```
+
+Copy `.env.example` → `.env` and fill secrets locally (never commit `.env`).
 
 ## Quick start (API)
 

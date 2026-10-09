@@ -1,3 +1,18 @@
+# Secrets & local env (keep .env.example committed)
+.env
+.env.*
+!.env.example
+
+# Private product / architecture docs (not for public repo)
+docs/
+
+# Corpora, uploads, PageIndex trees, OCR dumps
+data/
+uploads/
+*.pdf
+*.epub
+
+# Python
 .venv/
 __pycache__/
 *.py[cod]
@@ -7,12 +22,27 @@ __pycache__/
 dist/
 build/
 *.egg-info/
-.env
-.env.local
-data/raw/
-data/pageindex/
+.coverage
+htmlcov/
+
+# Node / Next.js
 web/node_modules/
 web/.next/
 web/out/
-.DS_Store
+web/.turbo/
+npm-debug.log*
+yarn-error.log*
+
+# Logs, caches, OS
 *.log
+npm-install.log
+.DS_Store
+Thumbs.db
+.dist/
+.cursor/
+*.swp
+
+# Editor / local tooling
+.idea/
+.vscode/
+*.local
