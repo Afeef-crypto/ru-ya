@@ -34,7 +34,7 @@
 | Cache | Redis (hot session + TTL) |
 | Files | S3-compatible (MinIO locally) |
 | Embeddings | `BAAI/bge-m3` on Arabic-normalized text |
-| LLM | OpenAI-compatible chat API (env-configured) |
+| LLM | OpenRouter (OpenAI-compatible chat API, env-configured) |
 | Long documents | PageIndex tree build + LLM tree navigation |
 | Short / symbol search | pgvector + metadata filters |
 | Workers | RQ (Redis queue) for ingest / OCR / embed |

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ru-ya E2E</title>
+  <style>
+    :root { --bg:#0f1410; --fg:#e8efe6; --muted:#9aab9a; --accent:#c4a35a; --panel:#1a221c; --border:#2a362c; }
+    body { margin:0; font-family: Georgia, "Iowan Old Style", serif; background:radial-gradient(ellipse at top,#1c2a20,var(--bg)); color:var(--fg); }
+    main { max-width:42rem; margin:0 auto; padding:2rem 1.25rem 4rem; }
+    h1 { font-size:2.6rem; margin:0 0 .5rem; }
+    .lead,.muted { color:var(--muted); }
+    .panel { background:var(--panel); border:1px solid var(--border); padding:1.1rem; margin:1rem 0; }
+    label { display:block; font-size:.85rem; color:var(--muted); margin:.4rem 0; }
+    select,textarea,input,button { width:100%; box-sizing:border-box; font:inherit; margin-bottom:.75rem; }
+    select,textarea,input { background:#121812; color:var(--fg); border:1px solid var(--border); padding:.65rem .75rem; }
+    button { background:var(--accent); color:#1a1408; border:0; font-weight:700; padding:.75rem 1rem; cursor:pointer; width:auto; }
+    pre { white-space:pre-wrap; background:#121812; padding:1rem; border:1px solid var(--border); }
+    .err { color:#c45a5a; }
+    .badge { display:inline-block; border:1px solid var(--border); padding:.1rem .4rem; margin-right:.3rem; font-size:.75rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Ru-ya</h1>
+  <p class="lead">Static E2E harness against the FastAPI backend.</p>
+  <div class="panel">
+    <label>API base</label>
+    <input id="api" value="http://127.0.0.1:8000/api/v1" />
+    <button id="start">Begin intake</button>
+  </div>
+  <div id="q" class="panel" hidden>
+    <h2>Questionnaire</h2>
+    <label>Dreamer state</label>
+    <select id="dreamer_state"><option>anxiety</option><option>neutral</option><option>grief</option></select>
+    <label>Dream time</label>
+    <select id="dream_time"><option>other_night</option><option>last_third_night</option><option>after_fajr</option></select>
+    <label>Repetition</label>
+    <select id="repetition"><option>once</option><option>recurring</option></select>
+    <label>Waking emotion</label>
+    <select id="waking_emotion"><option>fear</option><option>joy</option><option>confusion</option></select>
+    <label>Narrative</label>
+    <textarea id="narrative">I saw a snake indoors at night. A man was standing nearby. I only observed and woke afraid.</textarea>
+    <button id="submitDream">Save & submit dream</button>
+  </div>
+  <div id="fu" class="panel" hidden></div>
+  <div id="out" class="panel" hidden></div>
+  <p id="status" class="muted"></p>
+  <p id="error" class="err"></p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let sessionId = null;
+const api = () => $('api').value.replace(/\/$/, '');
+async function j(method, path, body) {
+  const res = await fetch(api() + path, {
+    method,
+    headers: body ? {'Content-Type':'application/json'} : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.status === 204 ? null : res.json();
+}
+$('start').onclick = async () => {
+  try {
+    $('error').textContent = '';
+    const s = await j('POST', '/sessions', { language:'en', retain:false });
+    sessionId = s.id;
+    $('status').textContent = `Session ${sessionId} · ${s.state}`;
+    $('q').hidden = false;
+  } catch (e) { $('error').textContent = e.message; }
+};
+$('submitDream').onclick = async () => {
+  try {
+    $('error').textContent = '';
+    await j('PUT', `/sessions/${sessionId}/questionnaire`, {
+      dreamer_state: $('dreamer_state').value,
+      dream_time: $('dream_time').value,
+      repetition: $('repetition').value,
+      waking_emotion: $('waking_emotion').value,
+      locale_context: 'urban apartment',
+      sensitive_flags: ['none'],
+    });
+    let s = await j('POST', `/sessions/${sessionId}/dream`, { narrative: $('narrative').value });
+    while (s.state === 'awaiting_followups' && (s.pending_follow_ups||[]).length) {
+      const box = $('fu'); box.hidden = false; box.innerHTML = '<h2>Follow-ups</h2>';
+      const answers = {};
+      for (const q of s.pending_follow_ups) {
+        answers[q.slot] = ({
+          people_identity:'unknown man',
+          setting_indoor_outdoor:'indoors',
+          setting_day_night:'night',
+          observer_or_actor:'only observe'
+        })[q.slot] || 'unknown';
+        box.innerHTML += `<p class="muted">${q.prompt_en}</p><p><b>${answers[q.slot]}</b></p>`;
+      }
+      s = await j('POST', `/sessions/${sessionId}/follow-ups`, { answers });
+    }
+    $('status').textContent = `Concluding… (${s.state})`;
+    const res = await fetch(api() + `/sessions/${sessionId}/conclude`, { method:'POST' });
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', event='message', conclusion=null;
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream:true});
+      const lines = buf.split('\n'); buf = lines.pop() || '';
+      for (const line of lines) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        if (line.startsWith('data:')) {
+          try {
+            const data = JSON.parse(line.slice(5).trim());
+            $('status').textContent = `SSE ${event}`;
+            if (event === 'done' || event === 'refused') conclusion = data;
+          } catch {}
+        }
+      }
+    }
+    const out = $('out'); out.hidden = false;
+    out.innerHTML = `
+      <span class="badge">${conclusion.classification?.label}</span>
+      <span class="badge">confidence ${conclusion.confidence?.score}</span>
+      <span class="badge">claims ${(conclusion.claims||[]).length}</span>
+      <span class="badge">evidence ${(conclusion.evidence||[]).length}</span>
+      <pre>${conclusion.conclusion_md || ''}</pre>`;
+  } catch (e) { $('error').textContent = e.message; }
+};
+</script>
+</body>
+</html>

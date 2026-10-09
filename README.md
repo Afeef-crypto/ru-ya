@@ -48,4 +48,4 @@ pytest -q
 
 ## Stack (locked)
 
-Next.js · FastAPI · PostgreSQL 16 + pgvector · Redis · bge-m3 · PageIndex · OpenAI-compatible LLM (wired later; skeleton uses deterministic local stubs).
+Next.js · FastAPI · PostgreSQL 16 + pgvector · Redis · bge-m3 · PageIndex · OpenRouter (OpenAI-compatible) LLM (wired later; skeleton uses deterministic local stubs).

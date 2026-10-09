@@ -89,6 +89,15 @@ def synthesize_conclusion(
         confidence_score=confidence.score,
         graph=graph,
     )
+    conclusion_md = _maybe_llm_polish(
+        language=language,
+        draft_md=conclusion_md,
+        claims=claims,
+        evidence_items=evidence_items,
+        classification=classification,
+        graph=graph,
+        facts=facts,
+    )
 
     return ConclusionPayload(
         classification=classification,
@@ -230,6 +239,61 @@ def _draft_markdown(
 
 def _active_sensitivity(graph: DreamGraph) -> list[str]:
     return [f for f in (graph.sensitivity_flags or []) if f and f != "none"]
+
+
+def _maybe_llm_polish(
+    *,
+    language: str,
+    draft_md: str,
+    claims: list[Claim],
+    evidence_items: list[EvidenceItem],
+    classification: ClassificationResult,
+    graph: DreamGraph,
+    facts: dict[str, Any],
+) -> str:
+    try:
+        from ru_ya.llm.client import get_llm_client
+
+        client = get_llm_client()
+        if not client.enabled:
+            return draft_md
+    except Exception:  # noqa: BLE001
+        return draft_md
+
+    evidence_brief = "\n".join(
+        f"- [{e.cite_key or e.citation_id}] tier={e.reliability_tier} grade={e.hadith_grade}: {e.excerpt[:280]}"
+        for e in evidence_items[:8]
+    )
+    claims_brief = "\n".join(
+        f"- {c.text} cites={','.join(c.citation_ids)}" for c in claims
+    )
+    system = (
+        "You are Ru-ya, a careful Islamic dream-interpretation assistant. "
+        "Rewrite the draft conclusion. Rules: scholarly possibility only (not certainty); "
+        "every substantive claim must keep its citation ids; do not invent sources or rulings; "
+        "no medical/fiqh/life-decision directives; surface disagreement if present; "
+        "keep adab framing. Output markdown only."
+    )
+    user = (
+        f"Language: {language}\n"
+        f"Classification: {classification.label}\n"
+        f"Dream graph: {graph.model_dump()}\n"
+        f"Facts: {facts}\n"
+        f"Claims:\n{claims_brief}\n"
+        f"Evidence:\n{evidence_brief}\n"
+        f"Draft:\n{draft_md}\n"
+    )
+    try:
+        polished = client.chat(
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=900,
+        ).strip()
+        return polished or draft_md
+    except Exception:  # noqa: BLE001
+        return draft_md
 
 
 def _abstain_text(language: str) -> str:
